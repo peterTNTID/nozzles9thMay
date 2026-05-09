@@ -1,0 +1,43 @@
+# =============================================================================
+# .gitignore - DAW / NLE project housekeeping
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Logic Pro temp/cache
+*.logicx/Alternatives/*/
+*.logicx/Resources/
+*.logicx/Project File Backups/
+
+# Pro Tools temp/cache
+*.ptx.bak
+WaveCache.wfm
+DigiBase/
+Session File Backups/
+
+# Ableton Live temp/cache
+Ableton Project Info/
+Backup/
+
+# Final Cut Pro cache/render
+*.fcpbundle/RenderFiles/
+*.fcpbundle/AnalysisFiles/
+*.fcpbundle/TranscodeMedia/
+
+# Adobe Premiere cache
+Media Cache/
+Media Cache Files/
+Peak Files/
+*.cfa
+*.pek
+
+# General temp files
+*.tmp
+*.bak
+*.swp
+*~
+Thumbs.db
