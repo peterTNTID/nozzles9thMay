@@ -34,3 +34,15 @@ All audio, video, and DAW/NLE binary files are tracked by Git LFS automatically 
 | Premiere | `.prproj` `.mogrt` |
 | Images | `.psd` `.tiff` `.exr` `.dpx` `.png` `.jpg` |
 
+### LFS Storage
+
+Large files are stored on Google Cloud Storage via a self-hosted
+[LFS server](https://github.com/peterTNTID/lfsServer) running on Cloud Run.
+
+**Cloning**: No special setup needed — `git clone` and `git lfs pull` work
+without credentials (public reads).
+
+**Pushing** (write access): Requires the LFS API key configured via
+`git credential-store`. See the [LFS server repo](https://github.com/peterTNTID/lfsServer)
+for setup instructions.
+
