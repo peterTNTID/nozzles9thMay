@@ -28,8 +28,9 @@
 *.wmv filter=lfs diff=lfs merge=lfs -text
 *.webm filter=lfs diff=lfs merge=lfs -text
 # Logic Pro
-# .logicx bundles contain audio data inside
-*.logicx filter=lfs diff=lfs merge=lfs -text
+# NOTE: .logicx bundles are macOS directory packages, not single files.
+# Git tracks their contents as individual files. Audio/image files inside
+# are caught by the *.wav, *.jpg, etc. rules above.
 # Pro Tools
 *.ptx filter=lfs diff=lfs merge=lfs -text
 *.ptf filter=lfs diff=lfs merge=lfs -text

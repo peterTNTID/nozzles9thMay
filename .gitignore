@@ -8,10 +8,9 @@
 .LSOverride
 ._*
 
-# Logic Pro temp/cache
-*.logicx/Alternatives/*/
-*.logicx/Resources/
-*.logicx/Project File Backups/
+# Logic Pro temp/cache (directory-level tracking)
+Undo Data.nosync/
+Project File Backups/
 
 # Pro Tools temp/cache
 *.ptx.bak

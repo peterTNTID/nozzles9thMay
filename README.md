@@ -18,17 +18,19 @@ nozzles9May/
 
 ## Git LFS
 
-All audio, video, and DAW/NLE project files are tracked by Git LFS automatically via `.gitattributes`. Just commit normally — Git LFS handles the rest.
+All audio, video, and DAW/NLE binary files are tracked by Git LFS automatically via `.gitattributes`. Just commit normally — Git LFS handles the rest.
+
+**Note on Logic Pro**: `.logicx` bundles are macOS directory packages, so Git tracks their contents as individual files (not a single LFS blob). Audio and image files inside `.logicx` bundles are caught by the `*.wav`, `*.jpg`, etc. LFS rules.
 
 ### Tracked file types
 
 | Category | Extensions |
-|----------|-----------|
+|----------|-----------:|
 | Audio | `.wav` `.aif` `.aiff` `.flac` `.mp3` `.ogg` `.m4a` `.caf` |
 | Video | `.mov` `.mp4` `.avi` `.mkv` `.mxf` `.r3d` `.braw` `.prores` |
-| Logic Pro | `.logicx` |
 | Pro Tools | `.ptx` `.ptf` `.pts` |
 | Ableton | `.als` `.alp` `.adg` `.adv` `.alc` |
 | Final Cut | `.fcpbundle` `.fcpxml` `.fcpproject` |
 | Premiere | `.prproj` `.mogrt` |
 | Images | `.psd` `.tiff` `.exr` `.dpx` `.png` `.jpg` |
+
