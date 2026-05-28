@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# =============================================================================
+# post-commit — Auto-mirror new LFS objects to IPFS after each commit
+# =============================================================================
+#
+# This hook runs after every git commit. It:
+#   1. Detects new LFS objects not yet in .ipfs/manifest.jsonl
+#   2. Adds them to the local IPFS node
+#   3. If PINATA_JWT is set, pins them to Pinata
+#   4. Creates a follow-up commit with the updated manifest
+#
+# Install: ./tools/install-hooks.sh
+# =============================================================================
+
+# Prevent recursive hook invocation
+if [ -n "${LFS_IPFS_HOOK_RUNNING:-}" ]; then
+    exit 0
+fi
+export LFS_IPFS_HOOK_RUNNING=1
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+MANIFEST="$REPO_ROOT/.ipfs/manifest.jsonl"
+TOOLS_DIR="$REPO_ROOT/tools"
+
+# Source .env if it exists
+[ -f "$REPO_ROOT/.env" ] && source "$REPO_ROOT/.env"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+DIM='\033[2m'
+NC='\033[0m'
+
+# ---------------------------------------------------------------------------
+# Check prerequisites
+# ---------------------------------------------------------------------------
+
+# Is ipfs installed?
+if ! command -v ipfs &>/dev/null; then
+    # Silent exit — don't bother user if they haven't set up IPFS yet
+    exit 0
+fi
+
+# Is the daemon running?
+if ! ipfs swarm peers &>/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠${NC}  IPFS daemon not running — skipping IPFS mirroring."
+    echo -e "   Start with: ${DIM}ipfs daemon &${NC}"
+    echo -e "   Or run:     ${DIM}./tools/setup-ipfs.sh${NC}"
+    exit 0
+fi
+
+# Is jq installed?
+if ! command -v jq &>/dev/null; then
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Detect new LFS objects
+# ---------------------------------------------------------------------------
+
+mkdir -p "$(dirname "$MANIFEST")"
+touch "$MANIFEST"
+
+# Get current LFS objects
+declare -a new_files=()
+
+while IFS= read -r line; do
+    oid=$(echo "$line" | awk '{print $1}')
+    full_oid="sha256:${oid}"
+
+    # Check if already in manifest
+    if ! grep -q "\"lfs_oid\":\"${full_oid}\"" "$MANIFEST" 2>/dev/null; then
+        new_files+=("$line")
+    fi
+done < <(git lfs ls-files --long 2>/dev/null)
+
+# Nothing new? Exit silently.
+if [ ${#new_files[@]} -eq 0 ]; then
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Mirror new files to IPFS
+# ---------------------------------------------------------------------------
+
+echo ""
+echo -e "${BLUE}ℹ${NC}  IPFS: Mirroring ${#new_files[@]} new LFS object(s)..."
+
+added=0
+
+for line in "${new_files[@]}"; do
+    oid=$(echo "$line" | awk '{print $1}')
+    path=$(echo "$line" | sed 's/^[a-f0-9]* [*-] //')
+    full_oid="sha256:${oid}"
+
+    # Resolve LFS object path
+    prefix1="${oid:0:2}"
+    prefix2="${oid:2:2}"
+    obj_path="$REPO_ROOT/.git/lfs/objects/${prefix1}/${prefix2}/${oid}"
+
+    if [ ! -f "$obj_path" ]; then
+        continue
+    fi
+
+    # Get size
+    size=$(wc -c < "$obj_path" | tr -d ' ')
+
+    # Add to IPFS
+    cid=$(ipfs add --cid-version=1 --raw-leaves --pin=true --quieter "$obj_path" 2>/dev/null) || continue
+
+    if [ -z "$cid" ]; then
+        continue
+    fi
+
+    # Pin to Pinata if JWT is set
+    pinata_id="null"
+    if [ -n "${PINATA_JWT:-}" ]; then
+        basename=$(basename "$path")
+        response=$(curl -s -X POST "https://api.pinata.cloud/pinning/pinByHash" \
+            -H "Authorization: Bearer ${PINATA_JWT}" \
+            -H "Content-Type: application/json" \
+            -d "{\"hashToPin\":\"${cid}\",\"pinataMetadata\":{\"name\":\"${basename}\"}}" \
+            2>/dev/null) || true
+
+        pid=$(echo "$response" | jq -r '.id // .IpfsHash // empty' 2>/dev/null) || true
+        [ -n "$pid" ] && pinata_id="\"${pid}\""
+    fi
+
+    # Append to manifest
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    echo "{\"path\":\"${path}\",\"lfs_oid\":\"${full_oid}\",\"ipfs_cid\":\"${cid}\",\"size\":${size},\"added\":\"${timestamp}\",\"pinata_id\":${pinata_id}}" >> "$MANIFEST"
+
+    echo -e "  ${GREEN}✓${NC} ${path} → ${DIM}${cid:0:20}...${NC}"
+    added=$((added + 1))
+done
+
+if [ "$added" -eq 0 ]; then
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Create follow-up commit with updated manifest
+# ---------------------------------------------------------------------------
+
+echo -e "${BLUE}ℹ${NC}  Committing updated manifest (${added} new entries)..."
+
+git add "$MANIFEST"
+git commit --no-verify -m "chore: update IPFS manifest (${added} files auto-mirrored)" --quiet
+
+echo -e "${GREEN}✓${NC}  IPFS manifest updated."
+
+# ---------------------------------------------------------------------------
+# Sync manifest to LFS server (enables /ipfs/<cid> gateway)
+# ---------------------------------------------------------------------------
+
+if [ -x "$TOOLS_DIR/sync-manifest.sh" ]; then
+    "$TOOLS_DIR/sync-manifest.sh" 2>/dev/null && \
+        echo -e "${GREEN}✓${NC}  Manifest synced to LFS server gateway." || \
+        echo -e "${YELLOW}⚠${NC}  Manifest sync to LFS server skipped (no credentials or server unavailable)."
+fi
+
+echo ""

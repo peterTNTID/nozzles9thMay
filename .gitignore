@@ -34,6 +34,9 @@ Peak Files/
 *.cfa
 *.pek
 
+# Secrets (Pinata keys, etc.)
+.env
+
 # General temp files
 *.tmp
 *.bak
